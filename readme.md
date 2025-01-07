@@ -3,6 +3,7 @@
 这个是中间件服务器，用于处理文档的实时协作，广播消息，它需要配合主服务器使用
 
 前端：`react`、`tailwindcss`、`alova`、`mitt`、`zustand`、`tiptap`系列、`yjs`系列等
+
 后端：`golang(goframe)`、`nodejs(koa)`
 
 # 作者留言
