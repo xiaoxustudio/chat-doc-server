@@ -114,7 +114,7 @@ const server = Server.configure({
 
 		const users = docData.users as Map<any, any>;
 		// 如果没有用户在线
-		if (!users || users.size == 0) {
+		if (users?.size == 0) {
 			const title = data.document.getText("title").toString();
 			const content = data.document.getXmlFragment("default").toJSON();
 			wsIns.send(
