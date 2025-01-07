@@ -6,6 +6,19 @@
 
 后端：`golang(goframe)`、`nodejs(koa)`
 
+
+# 实现
+
+- 登录
+- 注册
+- 邮箱验证
+- 群聊（聊天，创建，发送消息，撤回，退出、删除群聊等）
+- 好友（聊天，添加好友，删除好友，撤回等）
+- 文档（多人协作编辑(tiptap+yjs)，权限设置，删除，添加协作者等）
+
+![](https://raw.githubusercontent.com/xiaoxustudio/gf_chat_server/refs/heads/main/image.png)
+
+
 # 作者留言
 
 作者是一个全栈开发者，但主攻前端，所以后端可能写的不是很规范。
