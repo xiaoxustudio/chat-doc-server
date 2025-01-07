@@ -1,9 +1,4 @@
-import {
-	Configuration,
-	onLoadDocumentPayload,
-	onStoreDocumentPayload,
-	Server,
-} from "@hocuspocus/server";
+import { Configuration, Server } from "@hocuspocus/server";
 import { TiptapTransformer } from "@hocuspocus/transformer";
 // 服务器相关
 import Koa from "koa";
@@ -34,8 +29,13 @@ interface IDocProp {
 const docWs = new Map<string, IDocProp>();
 const docWsFuns = new Map<string, ((...args: any[]) => void)[]>(); // 回调执行栈
 
+// master 配置
+const masterConfig = {
+	url: "localhost:8000",
+};
+
 // master Websocket
-const wsIns = new ws("ws://localhost:8000/doc");
+let wsIns = new ws(`ws://${masterConfig.url}/doc`);
 wsIns.onopen = () => {
 	if (wsIns.readyState === ws.OPEN) {
 		console.log("连接到 Master");
@@ -61,7 +61,16 @@ wsIns.onmessage = (e) => {
 		console.log("master 消息接收失败", e);
 	}
 };
-wsIns.onerror = wsIns.onclose = () => console.log("连接 master 失败");
+wsIns.onerror = wsIns.onclose = () => {
+	console.log("连接 master 失败");
+	wsIns.close();
+	const newWs = new ws(`ws://${masterConfig.url}/doc`);
+	newWs.onmessage = wsIns.onmessage;
+	newWs.onerror = wsIns.onerror;
+	// @ts-expect-error
+	newWs.onclose = wsIns.onerror;
+	wsIns = newWs;
+};
 
 const server = Server.configure({
 	...config,
@@ -81,21 +90,24 @@ const server = Server.configure({
 		}
 	},
 	async onLoadDocument(data) {
-		let callArr = docWsFuns.get(data.documentName);
-		if (!callArr) {
-			callArr = [];
-			docWsFuns.set(data.documentName, callArr);
+		const DocData = docWs.get(data.documentName);
+		if (!DocData || !DocData.ready) {
+			let callArr = docWsFuns.get(data.documentName);
+			if (!callArr) {
+				callArr = [];
+				docWsFuns.set(data.documentName, callArr);
+			}
+			callArr.push(() => {
+				const d = docWs.get(data.documentName)!;
+				const domString = domStringToProseMirrorJson(d.content);
+				const transform = TiptapTransformer.toYdoc(domString, "default");
+				const ytitle = data.document.getText("title");
+				ytitle.delete(0, ytitle.length);
+				ytitle.insert(0, d.title);
+				data.document.merge(transform);
+				console.log("文档ID：", data.documentName); // 文档ID
+			});
 		}
-		callArr.push(() => {
-			const d = docWs.get(data.documentName)!;
-			const domString = domStringToProseMirrorJson(d.content);
-			const transform = TiptapTransformer.toYdoc(domString, "default");
-			const ytitle = data.document.getText("title");
-			ytitle.delete(0, ytitle.length);
-			ytitle.insert(0, d.title);
-			data.document.merge(transform);
-			console.log("文档ID：", data.documentName); // 文档ID
-		});
 	},
 	async onAwarenessUpdate(data) {
 		const domName = data.documentName;
@@ -114,7 +126,7 @@ const server = Server.configure({
 
 		const users = docData.users as Map<any, any>;
 		// 如果没有用户在线
-		if (users?.size == 0) {
+		if (users?.size == 0 && docData.ready) {
 			const title = data.document.getText("title").toString();
 			const content = data.document.getXmlFragment("default").toJSON();
 			wsIns.send(
@@ -135,10 +147,6 @@ const server = Server.configure({
 			docWsFuns.delete(docName);
 			console.log("文档退出：", docName);
 		}
-		server.closeConnections(data.documentName);
-	},
-	async onDestroy(data) {
-		data.instance.destroy();
 	},
 });
 
